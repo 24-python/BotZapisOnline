@@ -350,6 +350,21 @@ def view_appointments(message):
     bot.send_message(user_id, response, reply_markup=main_menu())
 
 
+# Функция для вывода контактов
+@bot.message_handler(func=lambda message: message.text == 'Контакты')
+def contacts(message):
+    bot.send_message(message.chat.id, "Контакты:\nТелефон: +7 (123) 456-78-90\nEmail: example@example.com",
+                     reply_markup=main_menu())
+
+
+# Функция для помощи
+@bot.message_handler(func=lambda message: message.text == 'Помощь')
+def help_message(message):
+    bot.send_message(message.chat.id,
+                     "Помощь:\n1. Чтобы записаться, выберите 'Выбор услуги'.\n2. Далее следуйте инструкциям.\n3. Для отмены записи выберите 'Отменить запись'.",
+                     reply_markup=main_menu())
+
+
 # Инициализация базы данных
 init_db()
 

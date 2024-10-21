@@ -4,11 +4,13 @@ def init_db():
     conn = sqlite3.connect('appointments.db')
     cursor = conn.cursor()
 
+    # Создание таблицы users, если она не существует
     cursor.execute('''CREATE TABLE IF NOT EXISTS users (
                         user_id INTEGER PRIMARY KEY, 
                         username TEXT, 
                         full_name TEXT)''')
 
+    # Создание таблицы appointments, если она не существует
     cursor.execute('''CREATE TABLE IF NOT EXISTS appointments (
                         id INTEGER PRIMARY KEY AUTOINCREMENT, 
                         user_id INTEGER, 
@@ -18,6 +20,15 @@ def init_db():
                         time TEXT,
                         UNIQUE(user_id, date, time))''')
 
+    conn.commit()
+    conn.close()
+
+def save_user_name(user_id, full_name):
+    conn = sqlite3.connect('appointments.db')
+    cursor = conn.cursor()
+
+    cursor.execute('''INSERT OR REPLACE INTO users (user_id, full_name) 
+                      VALUES (?, ?)''', (user_id, full_name))
     conn.commit()
     conn.close()
 

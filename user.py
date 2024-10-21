@@ -1,7 +1,11 @@
 import db
 from telebot import types
 from datetime import datetime, timedelta
+import schedule
+import time
+import threading
 import sqlite3
+import pytz  # Для работы с часовыми поясами
 
 services = {
     'Мужская стрижка': ['Мастер 1', 'Мастер 2'],
@@ -11,6 +15,7 @@ services = {
 
 user_appointments = {}
 user_steps = {}
+user_timezones = {}  # Хранение часовых поясов пользователей
 
 def main_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -130,8 +135,33 @@ def confirm_appointment(message, bot):
 
     if success:
         bot.send_message(user_id, "Запись успешно добавлена!", reply_markup=main_menu())
+        schedule_reminder(bot, user_id, user_appointments[user_id]['service'],
+                          user_appointments[user_id]['master'],
+                          user_appointments[user_id]['date'], selected_time)
     else:
         bot.send_message(user_id, "Ошибка: Запись на это время уже существует.", reply_markup=main_menu())
+
+def schedule_reminder(bot, user_id, service, master, date, time):
+    # Определяем часовой пояс пользователя
+    user_timezone = user_timezones.get(user_id, 'Europe/Moscow')  # По умолчанию 'Europe/Moscow'
+    tz = pytz.timezone(user_timezone)
+
+    # Определяем время напоминания (за 24 часа до записи)
+    appointment_time = tz.localize(datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M"))
+    reminder_time = appointment_time - timedelta(days=1)
+
+    schedule.every().day.at(reminder_time.strftime("%H:%M")).do(send_reminder, bot, user_id, service, master, date, time)
+
+    # Запускаем планировщик в отдельном потоке
+    threading.Thread(target=run_schedule).start()
+
+def run_schedule():
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
+
+def send_reminder(bot, user_id, service, master, date, time):
+    bot.send_message(user_id, f"НАПОМИНАНИЕ! у вас запись: {service} у {master} на {date} в {time}.")
 
 def view_appointments(message, bot):
     user_id = message.chat.id
@@ -149,12 +179,11 @@ def cancel_appointment(message, bot):
 
     if appointments:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        # Добавлено: вывод информации о записи (услуга, мастер, дата и время)
         for service, master, date, time in appointments:
             markup.add(types.KeyboardButton(f"{service}, {master}, {date} {time}"))
 
         markup.add(types.KeyboardButton('Назад'))
-        bot.send_message(user_id, "Выберите запись для отмены:", reply_markup=markup)
+        bot.send_message(user_id, "Выберите запись для отмены (вид услуги, мастер, дата, время):", reply_markup=markup)
         bot.register_next_step_handler(message, lambda msg: confirm_cancel(msg, bot))
     else:
         bot.send_message(user_id, "У вас нет записей.", reply_markup=main_menu())
@@ -164,7 +193,6 @@ def confirm_cancel(message, bot):
         bot.send_message(message.chat.id, "Отмена записи отменена.", reply_markup=main_menu())
         return
 
-    # Разбираем текст, чтобы получить информацию о записи
     full_info = message.text
     try:
         service, master, datetime_info = full_info.split(', ', 2)

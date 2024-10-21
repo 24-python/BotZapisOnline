@@ -149,8 +149,9 @@ def cancel_appointment(message, bot):
 
     if appointments:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        # Добавлено: вывод информации о записи (услуга, мастер, дата и время)
         for service, master, date, time in appointments:
-            markup.add(types.KeyboardButton(f"{date} {time}"))
+            markup.add(types.KeyboardButton(f"{service}, {master}, {date} {time}"))
 
         markup.add(types.KeyboardButton('Назад'))
         bot.send_message(user_id, "Выберите запись для отмены:", reply_markup=markup)
@@ -163,11 +164,17 @@ def confirm_cancel(message, bot):
         bot.send_message(message.chat.id, "Отмена записи отменена.", reply_markup=main_menu())
         return
 
-    date, time = message.text.split()
-    user_id = message.chat.id
-    db.delete_appointment(user_id, date, time)
+    # Разбираем текст, чтобы получить информацию о записи
+    full_info = message.text
+    try:
+        service, master, datetime_info = full_info.split(', ', 2)
+        date, time = datetime_info.split()
+        user_id = message.chat.id
+        db.delete_appointment(user_id, date, time)
 
-    bot.send_message(user_id, f"Запись на {date} {time} отменена.", reply_markup=main_menu())
+        bot.send_message(user_id, f"Запись на {service}, мастер {master}, {date} {time} отменена.", reply_markup=main_menu())
+    except ValueError:
+        bot.send_message(message.chat.id, "Неверный формат записи. Попробуйте снова.", reply_markup=main_menu())
 
 def send_contacts(message, bot):
     bot.send_message(message.chat.id, "Наши контакты: +7 (123) 456-78-90, ул. Примерная, д. 1", reply_markup=main_menu())
